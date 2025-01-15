@@ -219,7 +219,7 @@ class OmniGenInference:
             # Create pipeline
             try:
                 # Initialize pipeline
-                pipe = self.OmniGenPipeline.from_pretrained(Paths.OMNIGEN_DIR)
+                pipe = self.OmniGenPipeline.from_pretrained(Paths.MODELS_DIR)
                     
                 if pipe is None:
                     raise RuntimeError("Initial pipeline creation failed")

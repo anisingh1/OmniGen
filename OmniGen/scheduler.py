@@ -8,17 +8,16 @@ from transformers.cache_utils import Cache, DynamicCache, OffloadedCache
 
 
 class OmniGenCache(DynamicCache):
-    def __init__(self, 
-                    num_tokens_for_img: int, offload_kv_cache: bool=False) -> None:
-        if not torch.cuda.is_available():
-            # print("No avaliable GPU, offload_kv_cache wiil be set to False, which will result in large memory usage and time cost when input multiple images!!!")
-            # offload_kv_cache = False
-            raise RuntimeError("OffloadedCache can only be used with a GPU. If there is no GPU, you need to set use_kv_cache=False, which will result in longer inference time!")
+    def __init__(self, num_tokens_for_img: int, offload_kv_cache: bool=False) -> None:
         super().__init__()
         self.original_device = []
         self.prefetch_stream = torch.cuda.Stream()
         self.num_tokens_for_img = num_tokens_for_img
-        self.offload_kv_cache = offload_kv_cache
+        if not torch.cuda.is_available():
+            print("No avaliable GPU, offload_kv_cache wiil be set to False, which will result in large memory usage and time cost when input multiple images!!!")
+            offload_kv_cache = False
+        else:
+            self.offload_kv_cache = offload_kv_cache
 
     def prefetch_layer(self, layer_idx: int):
         "Starts prefetching the next layer cache"

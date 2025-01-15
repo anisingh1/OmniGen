@@ -18,12 +18,28 @@ from diffusers.utils import (
     unscale_lora_layers,
 )
 from safetensors.torch import load_file
-
 from OmniGen import OmniGen, OmniGenProcessor, OmniGenScheduler
 
 
 logger = logging.get_logger(__name__) 
 
+
+def get_device():
+    device = "cpu"
+    if torch.backends.mps.is_available():
+        device = "mps"
+    if torch.cuda.is_available():
+        device = "cuda"
+    return device
+
+
+def empty_cache():
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        
+        
 EXAMPLE_DOC_STRING = """
     Examples:
         ```py
@@ -56,13 +72,7 @@ class OmniGenPipeline:
         self.device = device
 
         if device is None:
-            if torch.cuda.is_available():
-                self.device = torch.device("cuda")
-            elif torch.backends.mps.is_available():
-                self.device = torch.device("mps")
-            else:
-                logger.info("Don't detect any available GPUs, using CPU instead, this may take long time to generate image!!!")
-                self.device = torch.device("cpu")
+            self.device = torch.device(get_device())
 
         # self.model.to(torch.bfloat16)
         self.model.eval()
@@ -71,7 +81,7 @@ class OmniGenPipeline:
         self.model_cpu_offload = False
 
     @classmethod
-    def from_pretrained(cls, model_name, vae_path: str=None):
+    def from_pretrained(cls, model_name, vae_path: str=None, device: Union[str, torch.device] = None):
         if not os.path.exists(model_name) or (not os.path.exists(os.path.join(model_name, 'model.safetensors')) and model_name == "Shitao/OmniGen-v1"):
             # logger.info("Model not found, downloading...")
             print("Model not found, downloading...")
@@ -83,6 +93,9 @@ class OmniGenPipeline:
             print(f"Downloaded model to {model_name}")
         model = OmniGen.from_pretrained(model_name)
         processor = OmniGenProcessor.from_pretrained(model_name)
+        
+        if device is None:
+            device = torch.device(get_device())
 
         if os.path.exists(os.path.join(model_name, "vae")):
             vae = AutoencoderKL.from_pretrained(os.path.join(model_name, "vae"))
@@ -125,7 +138,7 @@ class OmniGenPipeline:
         self.model_cpu_offload = True
         self.model.to("cpu")
         self.vae.to("cpu")
-        torch.cuda.empty_cache()  # Clear VRAM
+        empty_cache()  # Clear VRAM
         gc.collect()  # Run garbage collection to free system RAM
     
     def disable_model_cpu_offload(self):
@@ -251,7 +264,7 @@ class OmniGenPipeline:
                 input_img_latents.append(img)
         if input_images is not None and self.model_cpu_offload:
             self.vae.to('cpu')
-            torch.cuda.empty_cache()  # Clear VRAM
+            empty_cache()  # Clear VRAM
             gc.collect()  # Run garbage collection to free system RAM
 
         model_kwargs = dict(input_ids=self.move_to_device(input_data['input_ids']), 
@@ -288,7 +301,7 @@ class OmniGenPipeline:
 
         if self.model_cpu_offload:
             self.model.to('cpu')
-            torch.cuda.empty_cache()  
+            empty_cache()  
             gc.collect()  
 
         self.vae.to(self.device)
@@ -301,7 +314,7 @@ class OmniGenPipeline:
 
         if self.model_cpu_offload:
             self.vae.to('cpu')
-            torch.cuda.empty_cache()  
+            empty_cache()  
             gc.collect()  
         
         samples = (samples * 0.5 + 0.5).clamp(0, 1)
@@ -315,7 +328,7 @@ class OmniGenPipeline:
             for i, sample in enumerate(output_samples):
                 output_images.append(Image.fromarray(sample))
 
-        torch.cuda.empty_cache()  # Clear VRAM
+        empty_cache()  # Clear VRAM
         gc.collect()              # Run garbage collection to free system RAM
 
         return output_images

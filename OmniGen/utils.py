@@ -29,8 +29,6 @@ def update_ema(ema_model, model, decay=0.9999):
         ema_params[name].mul_(decay).add_(param.data, alpha=1 - decay)
 
 
-
-
 def requires_grad(model, flag=True):
     """
     Set requires_grad flag for all parameters in a model.
