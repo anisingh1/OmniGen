@@ -15,7 +15,8 @@ import uuid
 # Define all path constants
 class Paths:
     ROOT_DIR = osp.dirname(__file__)
-    MODELS_DIR = osp.join(ROOT_DIR, "models")
+    MODELS_DIR = osp.join(ROOT_DIR, "models", "gryan-OmniGen-v1-bnb-4bit")
+    VAE_PATH = osp.join(ROOT_DIR, "models", "vae")
     TMP_DIR = osp.join(ROOT_DIR, "tmp")
     MODEL_FILE_FP16 = osp.join(MODELS_DIR, "model.safetensors")
     MODEL_FILE_FP8 = osp.join(MODELS_DIR, "model-fp8_e4m3fn.safetensors")
@@ -103,6 +104,17 @@ class OmniGenInference:
                 raise RuntimeError("FP8 model download failed")
             if not osp.exists(Paths.MODEL_FILE_FP16):
                 raise RuntimeError("FP16 model download failed")
+            
+            if not os.path.exists(Paths.VAE_PATH):
+                print(f"No VAE found, downloading stabilityai/sdxl-vae from HF")
+                snapshot_download(
+                    repo_id="stabilityai/sdxl-vae",
+                    local_dir=Paths.MODELS_DIR,
+                    local_dir_use_symlinks=False,
+                    resume_download=True,
+                    token=None,
+                    tqdm_class=None,
+                )
                 
             print("OmniGen models verified successfully")
             
@@ -218,7 +230,7 @@ class OmniGenInference:
             # Create pipeline
             try:
                 # Initialize pipeline
-                pipe = self.OmniGenPipeline.from_pretrained(Paths.MODELS_DIR)
+                pipe = self.OmniGenPipeline.from_pretrained(model_name=Paths.MODELS_DIR, vae_path=Paths.VAE_PATH)
                     
                 if pipe is None:
                     raise RuntimeError("Initial pipeline creation failed")

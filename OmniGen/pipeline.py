@@ -90,7 +90,6 @@ class OmniGenPipeline:
             vae_path = "stabilityai/sdxl-vae"
             
         vae = AutoencoderKL.from_pretrained(vae_path).to(device)
-
         return cls(vae, model, processor, device)
     
     def merge_lora(self, lora_path: str):
