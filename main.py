@@ -15,7 +15,7 @@ import uuid
 # Define all path constants
 class Paths:
     ROOT_DIR = osp.dirname(__file__)
-    MODELS_DIR = osp.join(ROOT_DIR, "models", "gryan-OmniGen-v1-bnb-4bit")
+    MODELS_DIR = osp.join(ROOT_DIR, "models")
     VAE_PATH = osp.join(ROOT_DIR, "models", "vae")
     TMP_DIR = osp.join(ROOT_DIR, "tmp")
     MODEL_FILE_FP16 = osp.join(MODELS_DIR, "Shitao-OmniGen-v1", "model.safetensors")
@@ -26,9 +26,7 @@ sys.path.append(Paths.ROOT_DIR)
 
 
 class OmniGenInference:
-    VERSION = "1.2.0"
     _model_instance = None
-    _current_precision = None
     
     # Load preset prompts
     try:
@@ -66,7 +64,7 @@ class OmniGenInference:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def _ensure_model_exists(self, model_precision=None):
+    def _ensure_model_exists(self):
         """Ensure model file exists, download if not"""
         try:
             os.makedirs(Paths.MODELS_DIR, exist_ok=True)
@@ -129,22 +127,12 @@ class OmniGenInference:
         if hasattr(self, '_temp_dir') and osp.exists(self._temp_dir):
             shutil.rmtree(self._temp_dir)
 
-    def _auto_select_precision(self):
-        """Automatically select precision based on available VRAM"""
-        if torch.cuda.is_available():
-            vram_size = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            if vram_size < 8:
-                print(f"Auto selecting FP8 (Available VRAM: {vram_size:.1f}GB)")
-                return "FP8"
-        return "FP16"
-
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
                 "preset_prompt": (list(s.PRESET_PROMPTS.keys()), {"default": "None"}),
                 "prompt": ("STRING", {"multiline": True, "forceInput": False, "default": ""}),
-                "model_precision": (["Auto", "FP16", "FP8"], {"default": "Auto"}),
                 "memory_management": (["Balanced", "Speed Priority", "Memory Priority"], {"default": "Balanced"}),
                 "guidance_scale": ("FLOAT", {"default": 3.5, "min": 1.0, "max": 5.0, "step": 0.1, "round": 0.01}),
                 "img_guidance_scale": ("FLOAT", {"default": 1.8, "min": 1.0, "max": 2.0, "step": 0.1, "round": 0.01}),
@@ -162,10 +150,6 @@ class OmniGenInference:
                 "image_3": ("IMAGE",),
             }
         }
-    
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "generation"
-    CATEGORY = "🧪AILab/OmniGen"
 
     def save_input_img(self, image):
         try:
@@ -213,10 +197,10 @@ class OmniGenInference:
             print(f"Error checking SDPA support: {e}")
             return False
 
-    def _get_pipeline(self, model_precision):
+    def _get_pipeline(self):
         try:
             # Reuse existing instance if available
-            if self._model_instance and self._current_precision == model_precision:
+            if self._model_instance:
                 return self._model_instance
 
             # Check model file
@@ -230,7 +214,7 @@ class OmniGenInference:
             # Create pipeline
             try:
                 # Initialize pipeline
-                pipe = self.OmniGenPipeline.from_pretrained(model_name=Paths.MODELS_DIR, vae_path=Paths.VAE_PATH)
+                pipe = self.OmniGenPipeline.from_pretrained(model_name=os.path.dirname(model_file), vae_path=Paths.VAE_PATH)
                     
                 if pipe is None:
                     raise RuntimeError("Initial pipeline creation failed")
@@ -266,9 +250,7 @@ class OmniGenInference:
                     raise RuntimeError("Pipeline is not callable after initialization")
                     
                 # Save instance if needed
-                self._model_instance = pipe
-                self._current_precision = model_precision
-                    
+                self._model_instance = pipe   
                 return pipe
                     
             except Exception as pipe_error:
@@ -279,34 +261,21 @@ class OmniGenInference:
             print(f"Fatal error in pipeline creation: {str(e)}")
             raise RuntimeError(f"Failed to create pipeline: {str(e)}")
 
-    def generation(self, preset_prompt, model_precision, prompt, num_inference_steps, guidance_scale,
+    def generation(self, preset_prompt, prompt, num_inference_steps, guidance_scale,
             img_guidance_scale, max_input_image_size, separate_cfg_infer,
             use_input_image_size_as_output, width, height, seed, offload_model=False,
             image_1=None, image_2=None, image_3=None):
-        try:
-            # Auto select precision if Auto is chosen
-            if model_precision == "Auto":
-                model_precision = self._auto_select_precision()
-            
+        try:            
             self._setup_temp_dir()
             use_kv_cache = True
             if not torch.cuda.is_available():
                 use_kv_cache = False
             
-            # Clear existing instance if precision doesn't match
-            if self._model_instance and self._current_precision != model_precision:
-                print(f"Precision changed from {self._current_precision} to {model_precision}, clearing instance")
-                self._model_instance = None
-                self._current_precision = None
-                self._empty_cache()
-                print("VRAM cleared")
-            
             # Check model instance status
             print(f"Current model instance: {'Present' if self._model_instance else 'None'}")
-            print(f"Current model precision: {self._current_precision}")
             
             final_prompt = prompt.strip() if prompt.strip() else self.PRESET_PROMPTS[preset_prompt]
-            pipe = self._get_pipeline(model_precision)
+            pipe = self._get_pipeline()
             
             # Monitor VRAM usage
             if torch.cuda.is_available():
@@ -353,7 +322,6 @@ if __name__ == "__main__":
     obj = OmniGenInference()
     img = obj.generation(
         preset_prompt='',
-        model_precision='FP16',
         prompt='a young girl reading a book',
         num_inference_steps=25,
         guidance_scale=3.5,
