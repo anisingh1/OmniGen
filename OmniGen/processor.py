@@ -20,8 +20,6 @@ from OmniGen.utils import (
 )
 
 
-
-
 class OmniGenProcessor:
     def __init__(self, 
                 text_tokenizer, 

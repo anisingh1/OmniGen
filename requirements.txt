@@ -8,3 +8,9 @@ pillow==10.2.0
 peft==0.13.2
 diffusers==0.30.3
 timm==0.9.16
+
+
+#optional
+cog==0.13.6
+gradio==5.1.0
+spaces==0.32.0
