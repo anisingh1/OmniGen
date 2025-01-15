@@ -4,6 +4,23 @@ from PIL import Image
 import torch
 import numpy as np
 
+
+def get_device():
+    device = "cpu"
+    if torch.backends.mps.is_available():
+        device = "mps"
+    if torch.cuda.is_available():
+        device = "cuda"
+    return device
+
+
+def empty_cache():
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        
+        
 def create_logger(logging_dir):
     """
     Create a logger that writes to a log file and stdout.
