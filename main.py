@@ -19,8 +19,6 @@ class Paths:
     VAE_PATH = osp.join(ROOT_DIR, "models", "vae")
     TMP_DIR = osp.join(ROOT_DIR, "tmp")
     MODEL_FILE_FP16 = osp.join(MODELS_DIR, "Shitao-OmniGen-v1", "model.safetensors")
-    MODEL_FILE_BNB8 = osp.join(MODELS_DIR, "gryan-OmniGen-v1-bnb-8bit", "model.safetensors")
-    MODEL_FILE_BNB4 = osp.join(MODELS_DIR, "gryan-OmniGen-v1-bnb-4bit", "model.safetensors")
 
 # Ensure necessary directories exist
 os.makedirs(Paths.MODELS_DIR, exist_ok=True)
@@ -73,31 +71,18 @@ class OmniGenInference:
         try:
             os.makedirs(Paths.MODELS_DIR, exist_ok=True)
             
-            # Download BNB4 model if specified and not exists
-            if model_precision == "BNB4" and not osp.exists(Paths.MODEL_FILE_BNB4):
-                print("BNB4 model not found, downloading from Hugging Face...")
-                snapshot_download(
-                    repo_id="gryan/OmniGen-v1-bnb-4bit",
-                    local_dir=Paths.MODELS_DIR,
-                    local_dir_use_symlinks=False,
-                    resume_download=True,
-                    token=None,
-                    tqdm_class=None,
-                )
-                print("BNB4 model downloaded successfully")
-            
-            # Download BNB8 model if specified and not exists
-            if model_precision == "BNB8" and not osp.exists(Paths.MODEL_FILE_BNB8):
-                print("BNB8 model not found, downloading from Hugging Face...")
-                snapshot_download(
-                    repo_id="gryan/OmniGen-v1-bnb-8bit",
-                    local_dir=Paths.MODELS_DIR,
-                    local_dir_use_symlinks=False,
-                    resume_download=True,
-                    token=None,
-                    tqdm_class=None,
-                )
-                print("BNB8 model downloaded successfully")
+            # # Download BNB4 model if specified and not exists
+            # if model_precision == "BNB4" and not osp.exists(Paths.MODEL_FILE_BNB4):
+            #     print("BNB4 model not found, downloading from Hugging Face...")
+            #     snapshot_download(
+            #         repo_id="gryan/OmniGen-v1-bnb-4bit",
+            #         local_dir=Paths.MODELS_DIR,
+            #         local_dir_use_symlinks=False,
+            #         resume_download=True,
+            #         token=None,
+            #         tqdm_class=None,
+            #     )
+            #     print("BNB4 model downloaded successfully")
                 
             # Check if FP16 model exists
             if not osp.exists(Paths.MODEL_FILE_FP16):
@@ -113,10 +98,8 @@ class OmniGenInference:
                 print("FP16 model downloaded successfully")
             
             # Verify model files exist after download
-            if model_precision == "BNB4" and not osp.exists(Paths.MODEL_FILE_BNB4):
-                raise RuntimeError("BNB4 model download failed")
-            if model_precision == "BNB8" and not osp.exists(Paths.MODEL_FILE_BNB8):
-                raise RuntimeError("BNB8 model download failed")
+            # if model_precision == "BNB4" and not osp.exists(Paths.MODEL_FILE_BNB4):
+            #     raise RuntimeError("BNB4 model download failed")
             if not osp.exists(Paths.MODEL_FILE_FP16):
                 raise RuntimeError("FP16 model download failed")
             
@@ -238,10 +221,8 @@ class OmniGenInference:
 
             # Check model file
             model_file = Paths.MODEL_FILE_FP16
-            if model_precision == "BNB4":
-                model_file = Paths.MODEL_FILE_BNB4
-            elif model_precision == "BNB8":
-                model_file = Paths.MODEL_FILE_BNB8
+            # if model_precision == "BNB4":
+            #     model_file = Paths.MODEL_FILE_BNB4
                 
             if not os.path.exists(model_file):
                 raise RuntimeError(f"Model file not found: {model_file}")
