@@ -204,11 +204,10 @@ class OmniGenInference:
             print(f"Error checking SDPA support: {e}")
             return False
 
-    def _get_pipeline(self, model_precision, keep_in_vram):
+    def _get_pipeline(self, model_precision):
         try:
             # Reuse existing instance if available
-            if keep_in_vram and self._model_instance and self._current_precision == model_precision:
-                print("Reusing existing pipeline instance")
+            if self._model_instance and self._current_precision == model_precision:
                 return self._model_instance
 
             # Check model file
@@ -255,9 +254,8 @@ class OmniGenInference:
                     raise RuntimeError("Pipeline is not callable after initialization")
                     
                 # Save instance if needed
-                if keep_in_vram:
-                    self._model_instance = pipe
-                    self._current_precision = model_precision
+                self._model_instance = pipe
+                self._current_precision = model_precision
                     
                 return pipe
                     
@@ -269,9 +267,9 @@ class OmniGenInference:
             print(f"Fatal error in pipeline creation: {str(e)}")
             raise RuntimeError(f"Failed to create pipeline: {str(e)}")
 
-    def generation(self, preset_prompt, model_precision, prompt, memory_management, num_inference_steps, guidance_scale,
+    def generation(self, preset_prompt, model_precision, prompt, num_inference_steps, guidance_scale,
             img_guidance_scale, max_input_image_size, separate_cfg_infer,
-            use_input_image_size_as_output, width, height, seed,
+            use_input_image_size_as_output, width, height, seed, offload_model=False,
             image_1=None, image_2=None, image_3=None):
         try:
             # Auto select precision if Auto is chosen
@@ -290,23 +288,13 @@ class OmniGenInference:
                 self._current_precision = None
                 self._empty_cache()
                 print("VRAM cleared")
-                    
-            # Memory management strategy
-            if memory_management == "Memory Priority":
-                print("Memory Priority mode: Forcing pipeline recreation")
-                self._model_instance = None
-                self._current_precision = None
-                self._empty_cache()
-                    
-            keep_in_vram = (memory_management == "Speed Priority")
-            offload_model = (memory_management == "Memory Priority")
             
             # Check model instance status
             print(f"Current model instance: {'Present' if self._model_instance else 'None'}")
             print(f"Current model precision: {self._current_precision}")
             
             final_prompt = prompt.strip() if prompt.strip() else self.PRESET_PROMPTS[preset_prompt]
-            pipe = self._get_pipeline(model_precision, keep_in_vram)
+            pipe = self._get_pipeline(model_precision)
             
             # Monitor VRAM usage
             if torch.cuda.is_available():
@@ -340,31 +328,21 @@ class OmniGenInference:
             if torch.cuda.is_available():
                 print(f"VRAM usage after generation: {torch.cuda.memory_allocated()/1024**2:.2f}MB")
             
-            img = np.array(output[0]) / 255.0
-            img = torch.from_numpy(img).unsqueeze(0)
-            
-            # Clean up if not keeping in VRAM
-            if not keep_in_vram:
-                del pipe
-                self._empty_cache()
-                    
-            return (img,)
+            return output
             
         except Exception as e:
             print(f"Error during generation: {e}")
             raise e
         finally:
             self._cleanup_temp_dir()
-            if not keep_in_vram:
-                self._empty_cache()
 
 
 if __name__ == "__main__":
-    OmniGenInference.generation(
-        preset_prompt='Transform image_1 into an oil painting (image_1)',
+    obj = OmniGenInference()
+    img = obj.generation(
+        preset_prompt='',
         model_precision='FP16',
-        prompt='',
-        memory_management='Speed Priority',
+        prompt='a young girl reading a book',
         num_inference_steps=25,
         guidance_scale=3.5,
         img_guidance_scale=1.8,
@@ -374,4 +352,5 @@ if __name__ == "__main__":
         width=1024,
         height=1024,
         seed=10
-)
+    )[0]
+    img.save("image.png")
